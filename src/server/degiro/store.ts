@@ -1,9 +1,10 @@
 import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import type { DegiroSettings } from '../../shared/degiro.ts'
 import { writePrivateFile } from '../private-file.ts'
 
-export type Haircuts = Record<string, number>
+export const EMPTY_SETTINGS: DegiroSettings = { profile: null, customCreditPct: null, creditOverrides: {} }
 
 export interface SavedStatement {
    csv: string
@@ -13,8 +14,8 @@ export interface SavedStatement {
 export interface DegiroStore {
    loadStatement(): Promise<SavedStatement | null>
    saveStatement(csv: string): Promise<void>
-   loadHaircuts(): Promise<Haircuts>
-   saveHaircuts(haircuts: Haircuts): Promise<void>
+   loadSettings(): Promise<DegiroSettings>
+   saveSettings(settings: DegiroSettings): Promise<void>
 }
 
 function isMissing(error: unknown) {
@@ -23,7 +24,7 @@ function isMissing(error: unknown) {
 
 export function fileDegiroStore(folder: string): DegiroStore {
    const statementFile = join(folder, 'Account.csv')
-   const haircutsFile = join(folder, 'haircuts.json')
+   const settingsFile = join(folder, 'settings.json')
    return {
       async loadStatement() {
          try {
@@ -39,18 +40,18 @@ export function fileDegiroStore(folder: string): DegiroStore {
       async saveStatement(csv) {
          await writePrivateFile(statementFile, csv)
       },
-      async loadHaircuts() {
+      async loadSettings() {
          try {
-            return JSON.parse(await readFile(haircutsFile, 'utf8')) as Haircuts
+            return { ...EMPTY_SETTINGS, ...JSON.parse(await readFile(settingsFile, 'utf8')) as Partial<DegiroSettings> }
          } catch (error) {
             if (isMissing(error)) {
-               return {}
+               return EMPTY_SETTINGS
             }
             throw error
          }
       },
-      async saveHaircuts(haircuts) {
-         await writePrivateFile(haircutsFile, JSON.stringify(haircuts, null, 2))
+      async saveSettings(settings) {
+         await writePrivateFile(settingsFile, JSON.stringify(settings, null, 2))
       },
    }
 }

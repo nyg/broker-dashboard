@@ -1,3 +1,29 @@
+export type DegiroProfile = 'custody' | 'basic' | 'active' | 'trader' | 'custom'
+
+// Share of the value of shares and funds DEGIRO Switzerland lends against, by account profile:
+// https://www.degiro.ch/en/investing/margin-loans. Other DEGIRO entities may differ: pick 'custom'.
+export const PROFILE_CREDIT_PCT: Record<Exclude<DegiroProfile, 'custom'>, number> = {
+   custody: 0,
+   basic: 70,
+   active: 33,
+   trader: 70,
+}
+
+export const DEGIRO_PROFILES: DegiroProfile[] = ['custody', 'basic', 'active', 'trader', 'custom']
+
+export interface DegiroSettings {
+   profile: DegiroProfile | null
+   customCreditPct: number | null
+   creditOverrides: Record<string, number>
+}
+
+export function defaultCreditPct({ profile, customCreditPct }: Pick<DegiroSettings, 'profile' | 'customCreditPct'>) {
+   if (profile === null) {
+      return null
+   }
+   return profile === 'custom' ? customCreditPct : PROFILE_CREDIT_PCT[profile]
+}
+
 export interface DegiroPosition {
    isin: string
    product: string
@@ -7,7 +33,8 @@ export interface DegiroPosition {
    priceVenue: string | null
    priceError: string | null
    value: number | null
-   haircutPct: number | null
+   creditPct: number | null
+   creditOverridePct: number | null
    collateralValue: number
 }
 
@@ -18,7 +45,7 @@ export interface DegiroMargin {
    collateralValue: number
    freeSpace: number | null
    positionsWithoutPrice: number
-   positionsWithoutHaircut: number
+   positionsWithoutCredit: number
 }
 
 export interface DegiroDashboard {
@@ -26,6 +53,9 @@ export interface DegiroDashboard {
    currency: string
    statementSavedAt: string
    newestBooking: string | null
+   profile: DegiroProfile | null
+   customCreditPct: number | null
+   defaultCreditPct: number | null
    cash: number | null
    cashError: string | null
    positions: DegiroPosition[]

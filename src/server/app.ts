@@ -136,9 +136,14 @@ export function createApp({ allowedHosts, session, loadDashboard, ladder, degiro
       }),
    )
 
-   app.put('/api/degiro/haircuts/:isin', async c => respond(c, async () => {
+   app.put('/api/degiro/settings', async c => respond(c, async () => {
+      await degiro.updateSettings(await jsonBody(c))
+      return { saved: true }
+   }))
+
+   app.put('/api/degiro/credit/:isin', async c => respond(c, async () => {
       const body = await jsonBody(c)
-      await degiro.setHaircut(c.req.param('isin'), body.haircutPct ?? null)
+      await degiro.setCreditOverride(c.req.param('isin'), body.creditPct ?? null)
       return { saved: true }
    }))
 

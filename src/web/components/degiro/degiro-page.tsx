@@ -7,13 +7,22 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ValueListCard, type ValueRow } from '@/components/value-list-card'
 import type { Polled } from '@/hooks/use-polling'
-import { setHaircut, uploadStatement } from '@/lib/api'
+import { saveDegiroSettings, setCreditOverride, uploadStatement } from '@/lib/api'
 import { date, money, quantity } from '@/lib/format'
 
-import type { DegiroDashboard, DegiroPosition } from '../../../shared/degiro.ts'
+import {
+   DEGIRO_PROFILES,
+   type DegiroDashboard,
+   type DegiroPosition,
+   type DegiroProfile,
+   type DegiroSettings,
+   PROFILE_CREDIT_PCT,
+} from '../../../shared/degiro.ts'
 import { CLOSE_OUT_PCT, MARGIN_CALL_PCT, WATCH_PCT } from '../../../shared/margin.ts'
 
 const DEGIRO_LEVELS: GaugeLevels = {
@@ -21,7 +30,19 @@ const DEGIRO_LEVELS: GaugeLevels = {
    'watch': { label: 'Watch', text: `Above ${WATCH_PCT}%. DEGIRO makes a margin call at ${CLOSE_OUT_PCT}%, when free space turns negative.` },
    'margin-call': { label: 'Near a call', text: `Above ${MARGIN_CALL_PCT}%. At ${CLOSE_OUT_PCT}% free space turns negative and DEGIRO makes a margin call.` },
    'close-out': { label: 'Margin call', text: 'Free space is negative: DEGIRO asks you to add money or sell, and may sell positions itself.' },
-   'unknown': { label: 'Unknown', text: 'Not enough prices or haircuts to estimate it.' },
+   'unknown': { label: 'Unknown', text: 'Not enough prices or credit percentages to estimate it.' },
+}
+
+const PROFILE_NAMES: Record<DegiroProfile, string> = {
+   custody: 'Custody',
+   basic: 'Basic',
+   active: 'Active',
+   trader: 'Trader',
+   custom: 'Custom',
+}
+
+function profileLabel(profile: DegiroProfile) {
+   return profile === 'custom' ? 'Custom percentage' : `${PROFILE_NAMES[profile]}, ${PROFILE_CREDIT_PCT[profile]}%`
 }
 
 function errorMessage(error: unknown) {
@@ -81,18 +102,26 @@ function StatementCard({ dashboard, onUploaded }: { dashboard: DegiroDashboard |
    )
 }
 
-function HaircutInput({ position, onSaved }: { position: DegiroPosition, onSaved: () => void }) {
+interface PercentInputProps {
+   id?: string
+   label: string
+   value: number | null
+   placeholder?: string
+   onSave: (value: number | null) => Promise<void>
+   className?: string
+}
+
+function PercentInput({ id, label, value, placeholder = '–', onSave, className }: PercentInputProps) {
    const [error, setError] = useState<string | null>(null)
 
    async function save(text: string) {
-      const haircutPct = text.trim() === '' ? null : Number(text)
-      if (haircutPct === position.haircutPct) {
+      const next = text.trim() === '' ? null : Number(text)
+      if (next === value) {
          return
       }
       try {
-         await setHaircut(position.isin, haircutPct)
+         await onSave(next)
          setError(null)
-         onSaved()
       } catch (saveError) {
          setError(errorMessage(saveError))
       }
@@ -100,17 +129,18 @@ function HaircutInput({ position, onSaved }: { position: DegiroPosition, onSaved
 
    return (
       <Input
+         id={id}
          type="number"
          inputMode="decimal"
          min={0}
          max={100}
          step="any"
-         defaultValue={position.haircutPct ?? ''}
-         placeholder="–"
-         aria-label={`Haircut for ${position.product}, in percent`}
+         defaultValue={value ?? ''}
+         placeholder={placeholder}
+         aria-label={label}
          aria-invalid={error !== null}
          title={error ?? undefined}
-         className="ml-auto w-20 text-right"
+         className={className}
          onBlur={event => void save(event.currentTarget.value)}
          onKeyDown={event => {
             if (event.key === 'Enter') {
@@ -118,6 +148,58 @@ function HaircutInput({ position, onSaved }: { position: DegiroPosition, onSaved
             }
          }}
       />
+   )
+}
+
+function CreditCard({ dashboard, onSaved }: { dashboard: DegiroDashboard, onSaved: () => void }) {
+   const [error, setError] = useState<string | null>(null)
+
+   async function save(changes: Partial<Pick<DegiroSettings, 'profile' | 'customCreditPct'>>) {
+      try {
+         await saveDegiroSettings(changes)
+         setError(null)
+         onSaved()
+      } catch (saveError) {
+         setError(errorMessage(saveError))
+         throw saveError
+      }
+   }
+
+   return (
+      <Card>
+         <CardHeader>
+            <CardTitle>Credit</CardTitle>
+            <CardDescription>
+               DEGIRO lends against a share of each position&apos;s value, set by your account profile. DEGIRO shows the result under Available to trade, as Collateral value.
+            </CardDescription>
+         </CardHeader>
+         <CardContent className="space-y-3">
+            <div className="grid gap-1.5">
+               <Label htmlFor="degiro-profile">Account profile</Label>
+               <Select value={dashboard.profile ?? ''} onValueChange={profile => void save({ profile: profile as DegiroProfile }).catch(() => {})}>
+                  <SelectTrigger id="degiro-profile" className="w-full">
+                     <SelectValue placeholder="Choose your profile" />
+                  </SelectTrigger>
+                  <SelectContent>
+                     {DEGIRO_PROFILES.map(profile => <SelectItem key={profile} value={profile}>{profileLabel(profile)}</SelectItem>)}
+                  </SelectContent>
+               </Select>
+            </div>
+            {dashboard.profile === 'custom' && (
+               <div className="grid gap-1.5">
+                  <Label htmlFor="degiro-custom-credit">Credit, % of each position&apos;s value</Label>
+                  <PercentInput
+                     key={dashboard.customCreditPct}
+                     id="degiro-custom-credit"
+                     label="Credit, in percent of each position's value"
+                     value={dashboard.customCreditPct}
+                     onSave={customCreditPct => save({ customCreditPct })}
+                  />
+               </div>
+            )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
+         </CardContent>
+      </Card>
    )
 }
 
@@ -135,7 +217,7 @@ function PriceCell({ position }: { position: DegiroPosition }) {
    )
 }
 
-function positionColumns(onSaved: () => void): Column<DegiroPosition>[] {
+function positionColumns(defaultCreditPct: number | null, onSaved: () => void): Column<DegiroPosition>[] {
    return [
       {
          header: 'Product',
@@ -149,7 +231,23 @@ function positionColumns(onSaved: () => void): Column<DegiroPosition>[] {
       { header: 'Quantity', cell: row => quantity(row.quantity), numeric: true },
       { header: 'Price', cell: row => <PriceCell position={row} />, numeric: true },
       { header: 'Value', cell: row => money(row.value), numeric: true },
-      { header: 'Haircut %', cell: row => <HaircutInput key={`${row.isin}-${row.haircutPct}`} position={row} onSaved={onSaved} />, numeric: true },
+      {
+         header: 'Credit %',
+         cell: row => (
+            <PercentInput
+               key={`${row.isin}-${row.creditOverridePct}`}
+               label={`Credit for ${row.product}, in percent; empty uses the profile's`}
+               value={row.creditOverridePct}
+               placeholder={defaultCreditPct === null ? '–' : String(defaultCreditPct)}
+               onSave={async creditPct => {
+                  await setCreditOverride(row.isin, creditPct)
+                  onSaved()
+               }}
+               className="ml-auto w-20 text-right"
+            />
+         ),
+         numeric: true,
+      },
       { header: 'Collateral value', cell: row => money(row.collateralValue), numeric: true },
    ]
 }
@@ -161,7 +259,7 @@ function accountRows({ margin, cash, cashError }: DegiroDashboard): ValueRow[] {
       {
          label: 'Collateral value',
          value: money(margin.collateralValue),
-         hint: 'Each position\'s value less its haircut: what DEGIRO lends against.',
+         hint: 'The share of each position\'s value DEGIRO lends against.',
       },
       {
          label: 'Free space',
@@ -173,15 +271,21 @@ function accountRows({ margin, cash, cashError }: DegiroDashboard): ValueRow[] {
 }
 
 function Warnings({ dashboard }: { dashboard: DegiroDashboard }) {
-   const { positionsWithoutHaircut, positionsWithoutPrice } = dashboard.margin
+   const { positionsWithoutCredit, positionsWithoutPrice } = dashboard.margin
    return (
       <>
-         {positionsWithoutHaircut > 0 && (
+         {dashboard.profile === null && (
             <Alert>
-               <AlertTitle>{positionsWithoutHaircut === 1 ? '1 position has' : `${positionsWithoutHaircut} positions have`} no haircut</AlertTitle>
+               <AlertTitle>Choose your DEGIRO account profile</AlertTitle>
                <AlertDescription>
-                  Enter the share of each position&apos;s value that DEGIRO does not lend against. Until then it counts for no collateral, so the gauge errs high.
+                  It sets how much DEGIRO lends against your positions. Until then they count for no collateral, so the gauge cannot show a figure.
                </AlertDescription>
+            </Alert>
+         )}
+         {dashboard.profile !== null && positionsWithoutCredit > 0 && (
+            <Alert>
+               <AlertTitle>{positionsWithoutCredit === 1 ? '1 position has' : `${positionsWithoutCredit} positions have`} no credit percentage</AlertTitle>
+               <AlertDescription>Enter your custom percentage, or one per position. Until then they count for no collateral, so the gauge errs high.</AlertDescription>
             </Alert>
          )}
          {positionsWithoutPrice > 0 && (
@@ -222,7 +326,7 @@ export function DegiroPage({ state }: { state: Polled<{ dashboard: DegiroDashboa
             </Alert>
          )}
          <Warnings dashboard={dashboard} />
-         <div className="grid gap-4 lg:grid-cols-3">
+         <div className="grid items-start gap-4 lg:grid-cols-3">
             <MarginGauge
                title="Loan to collateral, estimated"
                value={margin.utilizationPct}
@@ -233,13 +337,16 @@ export function DegiroPage({ state }: { state: Polled<{ dashboard: DegiroDashboa
                ]}
             />
             <ValueListCard title={`Account (${currency})`} rows={accountRows(dashboard)} />
-            <StatementCard dashboard={dashboard} onUploaded={reload} />
+            <div className="grid gap-4">
+               <CreditCard dashboard={dashboard} onSaved={reload} />
+               <StatementCard dashboard={dashboard} onUploaded={reload} />
+            </div>
          </div>
          <TableCard
             title={`Positions (${currency})`}
-            description="Prices from justETF: an exchange quote, or the fund's last published NAV where justETF has none."
+            description="Prices from justETF: an exchange quote, or the fund's last published NAV where justETF has none. An empty Credit % uses the profile's; enter 0 for a product DEGIRO does not lend against."
             rows={dashboard.positions}
-            columns={positionColumns(reload)}
+            columns={positionColumns(dashboard.defaultCreditPct, reload)}
             rowKey={row => row.isin}
          />
       </div>

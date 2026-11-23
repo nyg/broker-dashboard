@@ -20,7 +20,17 @@ The levels come from [Saxo's Lombard loan page](https://www.home.saxo/en-ch/acco
 
 ## DEGIRO margin gauge
 
-The gauge estimates the loan as a share of the collateral value: the loan is the negative cash balance in the statement, and the collateral value is each position's value less its haircut, the share DEGIRO does not lend against. Enter each position's haircut in the Positions table. A position without a haircut or a price counts for no collateral, so the estimate errs high.
+The gauge estimates the loan as a share of the collateral value. The loan is the negative cash balance in the statement. The collateral value is the share of each position's value DEGIRO lends against, its credit percentage, which depends on the account profile you choose in the Credit card:
+
+| Profile | Credit |
+|---|---|
+| Custody | 0% |
+| Basic | 70% |
+| Active | 33% |
+| Trader | 70% |
+| Custom | the percentage you enter |
+
+The percentages are DEGIRO Switzerland's, from its [margin loans page](https://www.degiro.ch/en/investing/margin-loans); choose Custom where your DEGIRO entity differs. A position can override its profile's percentage in the Positions table, for example 0% for a product DEGIRO does not lend against. A position without a credit percentage or a price counts for no collateral, so the estimate errs high. Compare the result with DEGIRO's own collateral value under Available to trade.
 
 | Loan to collateral | Shown as | Meaning |
 |---|---|---|
@@ -118,7 +128,7 @@ Then run `sudo nft -f /etc/nftables.conf`.
 | `ALLOWED_HOSTS` | `localhost,127.0.0.1` | Host names the server answers to, which blocks DNS rebinding |
 | `TOKEN_FILE` | `~/.broker-dashboard/saxo-tokens.json` | Saved Saxo login, readable only by its owner |
 | `ORDERS_ENABLED` | `false` | `true` lets the Ladder orders tab precheck and place orders |
-| `DEGIRO_FOLDER` | `~/.broker-dashboard/degiro` | Uploaded DEGIRO statement and haircuts, readable only by their owner |
+| `DEGIRO_FOLDER` | `~/.broker-dashboard/degiro` | Uploaded DEGIRO statement and credit settings, readable only by their owner |
 
 ## Security
 
