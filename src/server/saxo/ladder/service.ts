@@ -13,7 +13,7 @@ import {
    type PrecheckResult,
    SIDES,
    SIZE_KINDS,
-} from '../../shared/ladder.ts'
+} from '../../../shared/ladder.ts'
 import { type SaxoApi,SaxoApiError } from '../saxo-api.ts'
 import type { SaxoAccount, SaxoBalance } from '../saxo-types.ts'
 import {

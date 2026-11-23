@@ -1,6 +1,6 @@
 import Big from 'big.js'
 
-import type { Duration, Side } from '../../shared/ladder.ts'
+import type { Duration, Side } from '../../../shared/ladder.ts'
 
 export interface TickSizeScheme {
    DefaultTickSize?: number

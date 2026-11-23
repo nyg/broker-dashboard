@@ -1,6 +1,6 @@
-import type { SessionStatus } from '../shared/dashboard.ts'
+import type { SessionStatus } from '../../shared/dashboard.ts'
+import type { Settings } from '../settings.ts'
 import { pkcePair, randomState, type TokenRequester, TokenRequestError, type TokenResponse } from './oauth.ts'
-import type { Settings } from './settings.ts'
 import type { StoredTokens, TokenStore } from './token-store.ts'
 
 // Saxo access tokens last 20 minutes and refresh tokens 60, so refreshing 2 minutes early keeps the login alive.

@@ -1,19 +1,19 @@
 [Unit]
-Description=Saxo dashboard
+Description=Broker dashboard
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/.local/opt/saxo-dashboard
-EnvironmentFile=%h/.config/saxo-dashboard/env
-ExecStart=%h/.local/opt/saxo-dashboard/deploy/start
+WorkingDirectory=%h/.local/opt/broker-dashboard
+EnvironmentFile=%h/.config/broker-dashboard/env
+ExecStart=%h/.local/opt/broker-dashboard/deploy/start
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=%h/.saxo-dashboard
+ReadWritePaths=%h/.broker-dashboard
 PrivateTmp=true
 
 [Install]

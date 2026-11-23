@@ -6,7 +6,7 @@ Run `pnpm lint`, `pnpm typecheck` and `pnpm test` after a change. Setup, deploym
 
 ## Layout
 
-- `src/server`: Hono server, run by Node.js straight from the TypeScript sources (type stripping), so relative imports end in `.ts`, path aliases do not resolve, and only erasable syntax works.
+- `src/server`: Hono server, run by Node.js straight from the TypeScript sources (type stripping), so relative imports end in `.ts`, path aliases do not resolve, and only erasable syntax works. `saxo/` talks to the Saxo OpenAPI; `degiro/` reads an uploaded `Account.csv` with `libdegiro` and prices it from justETF, since DEGIRO has no API.
 - `src/web`: React page built by Vite; `@/` points here.
 - `src/shared`: types and pure logic used by both, imported by relative path from each side.
 
@@ -25,3 +25,7 @@ Orders pass three gates, each kept on purpose: `ORDERS_ENABLED`, a clean Saxo pr
 - Without a price feed for an instrument, a net position comes back with `CurrentPrice: 0` and no market value, while its P/L is still filled in: `positionValues` rebuilds both.
 - Prices go through `priceOnTick` with big.js: a tick scheme's bands differ, and a price rounded with one band's tick can land in a lower band.
 - The margin gauge's 50 / 75 / 100% levels come from Saxo Switzerland's Lombard loan page, linked in `src/shared/margin.ts`.
+
+## DEGIRO
+
+DEGIRO's terms forbid scripts that connect to an account, so the server never logs in to DEGIRO and reads no DEGIRO endpoint: positions and cash come from the uploaded statement, prices from justETF. The margin is an estimate from haircuts the user enters; a position without a haircut or a price counts for no collateral.

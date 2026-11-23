@@ -1,11 +1,32 @@
-import { MarginGauge } from '@/components/margin-gauge'
+import { type GaugeLevels, MarginGauge } from '@/components/margin-gauge'
 import { type Column, TableCard } from '@/components/table-card'
 import { ValueListCard, type ValueRow } from '@/components/value-list-card'
 import { date, money, moneyAndPercent, percent, quantity, signClass } from '@/lib/format'
 
 import type { AccountRow, CollateralRow, Dashboard as DashboardData, MarginRow, OrderRow, PositionRow } from '../../shared/dashboard.ts'
+import { CLOSE_OUT_PCT, MARGIN_CALL_PCT, WATCH_PCT } from '../../shared/margin.ts'
 
 const DESCRIPTION_WIDTH = 32
+
+const SAXO_LEVELS: GaugeLevels = {
+   'safe': { label: 'Safe', text: `Well below the ${MARGIN_CALL_PCT}% level where Saxo starts margin calls.` },
+   'watch': { label: 'Watch', text: `Above ${WATCH_PCT}%. Saxo starts margin calls at ${MARGIN_CALL_PCT}%.` },
+   'margin-call': {
+      label: 'Margin call',
+      text: `At ${MARGIN_CALL_PCT}% or more Saxo sends margin calls. At ${CLOSE_OUT_PCT}% it may close positions.`,
+   },
+   'close-out': { label: 'Close-out', text: `At ${CLOSE_OUT_PCT}% Saxo may close positions and cancel open orders.` },
+   'unknown': { label: 'Unknown', text: 'Saxo did not return a utilisation figure.' },
+}
+
+function gaugeFigures({ margin, client }: DashboardData) {
+   return [
+      { label: 'Margin utilisation', value: percent(margin.marginUtilizationPct) },
+      { label: 'Collateral utilisation', value: percent(margin.collateralUtilizationPct) },
+      { label: `Loan (${client.currency})`, value: money(margin.collateralLoan, client.decimals) },
+      { label: `Collateral credit value (${client.currency})`, value: money(margin.collateralCreditLine, client.decimals) },
+   ]
+}
 
 function short(text: string) {
    return text.length > DESCRIPTION_WIDTH ? `${text.slice(0, DESCRIPTION_WIDTH - 1)}…` : text
@@ -121,7 +142,12 @@ export function Dashboard({ data }: { data: DashboardData }) {
    return (
       <div className="grid gap-4">
          <div className="grid gap-4 lg:grid-cols-3">
-            <MarginGauge margin={data.margin} currency={client.currency} decimals={client.decimals} />
+            <MarginGauge
+               title="Margin and loan utilisation"
+               value={data.margin.marginAndLoanUtilizationPct}
+               levels={SAXO_LEVELS}
+               figures={gaugeFigures(data)}
+            />
             <ValueListCard title={`Balance, all accounts (${client.currency})`} rows={balanceRows(data)} />
             <ValueListCard title={`P/L (${client.currency})`} rows={profitLossRows(data)} />
          </div>

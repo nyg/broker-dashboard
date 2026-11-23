@@ -1,4 +1,5 @@
 import type { Dashboard, SessionStatus } from '../../shared/dashboard.ts'
+import type { DegiroDashboard } from '../../shared/degiro.ts'
 import type {
    InstrumentCandidate,
    LadderError,
@@ -74,4 +75,27 @@ export function precheckLadder(planId: string) {
 
 export function placeLadder(planId: string, confirmation: string) {
    return postJson<PlaceResponse>('/api/ladder/place', { planId, confirmation })
+}
+
+export async function fetchDegiro() {
+   const response = await fetch('/api/degiro')
+   if (!response.ok) {
+      throw new Error(await errorText(response))
+   }
+   return { dashboard: await response.json() as DegiroDashboard | null }
+}
+
+async function put(path: string, contentType: string, body: BodyInit) {
+   const response = await fetch(path, { method: 'PUT', headers: { 'Content-Type': contentType }, body })
+   if (!response.ok) {
+      throw new Error(await errorText(response))
+   }
+}
+
+export function uploadStatement(file: File) {
+   return put('/api/degiro/statement', 'text/csv', file)
+}
+
+export function setHaircut(isin: string, haircutPct: number | null) {
+   return put(`/api/degiro/haircuts/${encodeURIComponent(isin)}`, 'application/json', JSON.stringify({ haircutPct }))
 }

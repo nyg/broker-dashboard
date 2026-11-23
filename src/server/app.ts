@@ -1,19 +1,26 @@
 import { serveStatic } from '@hono/node-server/serve-static'
 import { type Context, Hono, type MiddlewareHandler } from 'hono'
+import { bodyLimit } from 'hono/body-limit'
 import { csrf } from 'hono/csrf'
 
 import type { Dashboard } from '../shared/dashboard.ts'
-import { LadderInputError, type LadderService, LadderStateError, parseLadderRequest } from './ladder/service.ts'
-import { SaxoApiError } from './saxo-api.ts'
-import { NotLoggedInError, type Session } from './session.ts'
+import { DegiroInputError, type DegiroService } from './degiro/service.ts'
+import { LadderInputError, type LadderService, LadderStateError, parseLadderRequest } from './saxo/ladder/service.ts'
+import { SaxoApiError } from './saxo/saxo-api.ts'
+import { NotLoggedInError, type Session } from './saxo/session.ts'
 
 export interface AppOptions {
    allowedHosts: string[]
    session: Session
    loadDashboard: () => Promise<Dashboard>
    ladder: LadderService
+   degiro: DegiroService
    staticRoot?: string
 }
+
+class BadRequestError extends Error {}
+
+const STATEMENT_LIMIT_BYTES = 5 * 1024 * 1024
 
 // Rejects any Host the server was not configured for, so a DNS-rebinding page cannot read the dashboard.
 function allowedHostsOnly(allowedHosts: string[]): MiddlewareHandler {
@@ -37,15 +44,19 @@ export function callbackUrl(requestUrl: string) {
    return url.toString()
 }
 
-// Requiring JSON makes a cross-site POST need a CORS preflight, which this server never grants.
-async function jsonBody(c: Context): Promise<Record<string, unknown>> {
-   if (!c.req.header('content-type')?.startsWith('application/json')) {
-      throw new LadderInputError('Send the request as application/json.')
+// Requiring JSON or CSV makes a cross-site request need a CORS preflight, which this server never grants.
+function requireContentType(c: Context, type: string) {
+   if (!c.req.header('content-type')?.startsWith(type)) {
+      throw new BadRequestError(`Send the request as ${type}.`)
    }
+}
+
+async function jsonBody(c: Context): Promise<Record<string, unknown>> {
+   requireContentType(c, 'application/json')
    try {
       return await c.req.json()
    } catch {
-      throw new LadderInputError('The request body is not valid JSON.')
+      throw new BadRequestError('The request body is not valid JSON.')
    }
 }
 
@@ -59,6 +70,9 @@ async function respond(c: Context, handle: () => Promise<unknown>) {
       if (error instanceof LadderInputError) {
          return c.json({ error: error.message, candidates: error.candidates }, 400)
       }
+      if (error instanceof BadRequestError || error instanceof DegiroInputError) {
+         return c.json({ error: error.message }, 400)
+      }
       if (error instanceof LadderStateError) {
          return c.json({ error: error.message }, 409)
       }
@@ -71,7 +85,7 @@ function errorMessage(error: unknown) {
    return error instanceof Error ? error.message : String(error)
 }
 
-export function createApp({ allowedHosts, session, loadDashboard, ladder, staticRoot }: AppOptions) {
+export function createApp({ allowedHosts, session, loadDashboard, ladder, degiro, staticRoot }: AppOptions) {
    const app = new Hono()
    app.use(allowedHostsOnly(allowedHosts))
    app.use(csrf())
@@ -108,6 +122,24 @@ export function createApp({ allowedHosts, session, loadDashboard, ladder, static
    app.post('/api/ladder/place', async c => respond(c, async () => {
       const body = await jsonBody(c)
       return ladder.place(String(body.planId), String(body.confirmation ?? ''))
+   }))
+
+   app.get('/api/degiro', c => respond(c, () => degiro.dashboard()))
+
+   app.put(
+      '/api/degiro/statement',
+      bodyLimit({ maxSize: STATEMENT_LIMIT_BYTES, onError: c => c.json({ error: 'The statement is larger than 5 MB.' }, 413) }),
+      async c => respond(c, async () => {
+         requireContentType(c, 'text/csv')
+         await degiro.saveStatement(await c.req.text())
+         return { saved: true }
+      }),
+   )
+
+   app.put('/api/degiro/haircuts/:isin', async c => respond(c, async () => {
+      const body = await jsonBody(c)
+      await degiro.setHaircut(c.req.param('isin'), body.haircutPct ?? null)
+      return { saved: true }
    }))
 
    if (staticRoot) {
