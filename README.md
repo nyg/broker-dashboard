@@ -20,7 +20,22 @@ The levels come from [Saxo's Lombard loan page](https://www.home.saxo/en-ch/acco
 
 ## DEGIRO margin gauge
 
-The gauge estimates the loan as a share of the collateral value: the loan is the negative cash balance in the statement, and the collateral value is each position's value less its haircut, the share DEGIRO does not lend against. Enter each position's haircut in the Positions table. A position without a haircut or a price counts for no collateral, so the estimate errs high.
+DEGIRO makes a margin call when either of two tests fails, and the gauge shows the share of the loan each allows, whichever is higher. The loan is the negative cash balance in the statement.
+
+- **Credit test**: the loan against the collateral value, the share of each position's value DEGIRO lends against.
+- **Margin test**: the loan against the value of the positions less DEGIRO's portfolio risk. DEGIRO computes the risk from product categories, sectors and currencies the statement does not carry, so copy it from DEGIRO's Available to trade as Portfolio Risk divided by Value of portfolio, in the Margin settings card. Without it, the gauge shows the credit test alone.
+
+The collateral value uses each position's credit percentage, which depends on the account profile you choose in the Margin settings card:
+
+| Profile | Credit |
+|---|---|
+| Custody | 0% |
+| Basic | 70% |
+| Active | 33% |
+| Trader | 70% |
+| Custom | the percentage you enter |
+
+The percentages are DEGIRO Switzerland's, from its [margin loans page](https://www.degiro.ch/en/investing/margin-loans); choose Custom where your DEGIRO entity differs. A position can override its profile's percentage in the Positions table, for example 0% for a product DEGIRO does not lend against. A position without a credit percentage or a price counts for no collateral, so the estimate errs high. The Account card lists the same figures as DEGIRO's Available to trade, to compare them.
 
 | Loan to collateral | Shown as | Meaning |
 |---|---|---|
@@ -29,7 +44,7 @@ The gauge estimates the loan as a share of the collateral value: the loan is the
 | 75% to 100% | Near a call | |
 | 100% or more | Margin call | Free space is negative: DEGIRO asks you to add money or sell, and may sell positions itself |
 
-Free space is the collateral value plus the cash balance. The cash comes from the statement, so upload a newer one after you trade, deposit or withdraw.
+The cash comes from the statement, so upload a newer one after you trade, deposit or withdraw. Update the portfolio risk when DEGIRO's changes noticeably, as it does when the portfolio's composition changes.
 
 Prices come from [justETF](https://www.justetf.com) in the account currency: an exchange quote, or the fund's last published NAV where justETF has none. They are kept for 5 minutes. Cash in other currencies is converted with the ECB rates from [Frankfurter](https://frankfurter.dev).
 
@@ -118,7 +133,7 @@ Then run `sudo nft -f /etc/nftables.conf`.
 | `ALLOWED_HOSTS` | `localhost,127.0.0.1` | Host names the server answers to, which blocks DNS rebinding |
 | `TOKEN_FILE` | `~/.broker-dashboard/saxo-tokens.json` | Saved Saxo login, readable only by its owner |
 | `ORDERS_ENABLED` | `false` | `true` lets the Ladder orders tab precheck and place orders |
-| `DEGIRO_FOLDER` | `~/.broker-dashboard/degiro` | Uploaded DEGIRO statement and haircuts, readable only by their owner |
+| `DEGIRO_FOLDER` | `~/.broker-dashboard/degiro` | Uploaded DEGIRO statement and credit settings, readable only by their owner |
 
 ## Security
 

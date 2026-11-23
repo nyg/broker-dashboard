@@ -131,20 +131,36 @@ describe('DEGIRO routes', () => {
 
    it('answers 400 with the reason when the service refuses the input', async () => {
       // Given
-      const setHaircut = vi.fn(async () => {
-         throw new DegiroInputError('The haircut must be a percentage from 0 to 100.')
+      const setCreditOverride = vi.fn(async () => {
+         throw new DegiroInputError('The credit must be a percentage from 0 to 100.')
       })
 
       // When
-      const response = await app({ setHaircut }).app.request('http://192.168.1.133:8766/api/degiro/haircuts/IE00B4K48X80', {
+      const response = await app({ setCreditOverride }).app.request('http://192.168.1.133:8766/api/degiro/credit/IE00B4K48X80', {
          method: 'PUT',
          headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ haircutPct: 120 }),
+         body: JSON.stringify({ creditPct: 120 }),
       })
 
       // Then
       expect(response.status).toBe(400)
-      expect(await response.json()).toEqual({ error: 'The haircut must be a percentage from 0 to 100.' })
-      expect(setHaircut).toHaveBeenCalledWith('IE00B4K48X80', 120)
+      expect(await response.json()).toEqual({ error: 'The credit must be a percentage from 0 to 100.' })
+      expect(setCreditOverride).toHaveBeenCalledWith('IE00B4K48X80', 120)
+   })
+
+   it('passes the settings sent as JSON to the service', async () => {
+      // Given
+      const updateSettings = vi.fn(async () => {})
+
+      // When
+      const response = await app({ updateSettings }).app.request('http://192.168.1.133:8766/api/degiro/settings', {
+         method: 'PUT',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ profile: 'basic' }),
+      })
+
+      // Then
+      expect(response.status).toBe(200)
+      expect(updateSettings).toHaveBeenCalledWith({ profile: 'basic' })
    })
 })

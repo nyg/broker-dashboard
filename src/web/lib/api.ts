@@ -1,5 +1,5 @@
 import type { Dashboard, SessionStatus } from '../../shared/dashboard.ts'
-import type { DegiroDashboard } from '../../shared/degiro.ts'
+import type { DegiroDashboard, DegiroSettings } from '../../shared/degiro.ts'
 import type {
    InstrumentCandidate,
    LadderError,
@@ -96,6 +96,12 @@ export function uploadStatement(file: File) {
    return put('/api/degiro/statement', 'text/csv', file)
 }
 
-export function setHaircut(isin: string, haircutPct: number | null) {
-   return put(`/api/degiro/haircuts/${encodeURIComponent(isin)}`, 'application/json', JSON.stringify({ haircutPct }))
+export type DegiroSettingsChange = Partial<Pick<DegiroSettings, 'profile' | 'customCreditPct' | 'portfolioRiskPct'>>
+
+export function saveDegiroSettings(changes: DegiroSettingsChange) {
+   return put('/api/degiro/settings', 'application/json', JSON.stringify(changes))
+}
+
+export function setCreditOverride(isin: string, creditPct: number | null) {
+   return put(`/api/degiro/credit/${encodeURIComponent(isin)}`, 'application/json', JSON.stringify({ creditPct }))
 }

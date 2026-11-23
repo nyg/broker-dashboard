@@ -28,4 +28,4 @@ Orders pass three gates, each kept on purpose: `ORDERS_ENABLED`, a clean Saxo pr
 
 ## DEGIRO
 
-DEGIRO's terms forbid scripts that connect to an account, so the server never logs in to DEGIRO and reads no DEGIRO endpoint: positions and cash come from the uploaded statement, prices from justETF. The margin is an estimate from haircuts the user enters; a position without a haircut or a price counts for no collateral.
+DEGIRO's terms forbid scripts that connect to an account, so the server never logs in to DEGIRO and reads no DEGIRO endpoint: positions and cash come from the uploaded statement, prices from justETF. The margin is an estimate of DEGIRO's two tests. Credit: collateral is each position's value times the credit percentage of the account profile (`PROFILE_CREDIT_PCT` in `src/shared/degiro.ts`), or a per-position override; a position without a credit percentage or a price counts for no collateral. Margin: DEGIRO's portfolio risk depends on data the statement lacks, so the user enters it as a percentage of the portfolio value. The gauge shows the higher of the two.
