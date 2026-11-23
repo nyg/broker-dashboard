@@ -1,4 +1,12 @@
 import type { Dashboard, SessionStatus } from '../../shared/dashboard.ts'
+import type {
+   InstrumentCandidate,
+   LadderError,
+   LadderPreview,
+   LadderRequest,
+   PlaceResponse,
+   PrecheckResponse,
+} from '../../shared/ladder.ts'
 
 export class NotLoggedInError extends Error {}
 
@@ -32,4 +40,38 @@ export async function fetchDashboard() {
 
 export async function logout() {
    await fetch('/api/logout', { method: 'POST' })
+}
+
+export class ApiError extends Error {
+   readonly candidates: InstrumentCandidate[]
+
+   constructor(message: string, candidates: InstrumentCandidate[] = []) {
+      super(message)
+      this.candidates = candidates
+   }
+}
+
+async function postJson<T>(path: string, body: unknown) {
+   const response = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+   })
+   if (!response.ok) {
+      const error = await response.json().catch(() => ({})) as Partial<LadderError>
+      throw new ApiError(error.error ?? `HTTP ${response.status}`, error.candidates)
+   }
+   return await response.json() as T
+}
+
+export function previewLadder(request: LadderRequest) {
+   return postJson<LadderPreview>('/api/ladder/preview', request)
+}
+
+export function precheckLadder(planId: string) {
+   return postJson<PrecheckResponse>('/api/ladder/precheck', { planId })
+}
+
+export function placeLadder(planId: string, confirmation: string) {
+   return postJson<PlaceResponse>('/api/ladder/place', { planId, confirmation })
 }

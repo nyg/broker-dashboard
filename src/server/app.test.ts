@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { callbackUrl, createApp } from './app.ts'
+import type { LadderService } from './ladder/service.ts'
 import type { Session } from './session.ts'
 
 function app() {
@@ -9,7 +10,7 @@ function app() {
       logout: vi.fn(async () => {}),
       beginLogin: vi.fn((redirectUri: string) => `https://saxo.test/authorize?redirect_uri=${redirectUri}`),
    } as unknown as Session
-   return { session, app: createApp({ allowedHosts: ['192.168.1.133'], session, loadDashboard: vi.fn() }) }
+   return { session, app: createApp({ allowedHosts: ['192.168.1.133'], session, loadDashboard: vi.fn(), ladder: {} as LadderService }) }
 }
 
 describe('callbackUrl', () => {

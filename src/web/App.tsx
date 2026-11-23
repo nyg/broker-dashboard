@@ -1,11 +1,13 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 import { AppHeader } from '@/components/app-header'
 import { Dashboard } from '@/components/dashboard'
+import { LadderPage } from '@/components/ladder/ladder-page'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { usePolling } from '@/hooks/use-polling'
 import { fetchDashboard, fetchSession, logout, NotLoggedInError } from '@/lib/api'
 
@@ -66,6 +68,13 @@ export default function App() {
       await session.reload()
    }
 
+   const [tab, setTab] = useState(() => (window.location.hash === '#ladder' ? 'ladder' : 'portfolio'))
+
+   function selectTab(next: string) {
+      setTab(next)
+      window.history.replaceState(null, '', `#${next}`)
+   }
+
    const data = loggedIn ? dashboard.data : null
 
    return (
@@ -84,13 +93,26 @@ export default function App() {
             </Alert>
          )}
          {session.data && !loggedIn && <LoginCard error={session.data.error} />}
-         {loggedIn && dashboard.error && !(dashboard.error instanceof NotLoggedInError) && (
-            <Alert variant="destructive">
-               <AlertTitle>Could not load the portfolio{data ? ', showing the last data' : ''}</AlertTitle>
-               <AlertDescription>{dashboard.error.message}</AlertDescription>
-            </Alert>
+         {loggedIn && (
+            <Tabs value={tab} onValueChange={selectTab}>
+               <TabsList>
+                  <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+                  <TabsTrigger value="ladder">Ladder orders</TabsTrigger>
+               </TabsList>
+               <TabsContent value="portfolio" className="grid gap-4">
+                  {dashboard.error && !(dashboard.error instanceof NotLoggedInError) && (
+                     <Alert variant="destructive">
+                        <AlertTitle>Could not load the portfolio{data ? ', showing the last data' : ''}</AlertTitle>
+                        <AlertDescription>{dashboard.error.message}</AlertDescription>
+                     </Alert>
+                  )}
+                  {data ? <Dashboard data={data} /> : !dashboard.error && <Loading />}
+               </TabsContent>
+               <TabsContent value="ladder" forceMount className="data-[state=inactive]:hidden">
+                  <LadderPage onOrdersPlaced={() => void dashboard.reload()} />
+               </TabsContent>
+            </Tabs>
          )}
-         {loggedIn && (data ? <Dashboard data={data} /> : !dashboard.error && <Loading />)}
       </main>
    )
 }

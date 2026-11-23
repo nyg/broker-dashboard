@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@hono/node-server": "2.1.11",
+    "big.js": "7.0.1",
     "hono": "4.13.21"
   },
   "devDependencies": {
@@ -24,6 +25,7 @@
     "@fontsource-variable/geist-mono": "5.3.0",
     "@nyg/eslint-config": "github:nyg/eslint-config#v1.0.1",
     "@tailwindcss/vite": "4.3.5",
+    "@types/big.js": "7.0.0",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

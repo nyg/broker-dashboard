@@ -10,6 +10,7 @@ export interface Settings {
    port: number
    allowedHosts: string[]
    tokenFile: string
+   ordersEnabled: boolean
 }
 
 const DEFAULTS = {
@@ -20,6 +21,7 @@ const DEFAULTS = {
    PORT: '8766',
    ALLOWED_HOSTS: 'localhost,127.0.0.1',
    TOKEN_FILE: '~/.saxo-dashboard/tokens.json',
+   ORDERS_ENABLED: 'false',
 }
 
 type Name = keyof typeof DEFAULTS | 'SAXO_APP_KEY'
@@ -43,5 +45,6 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env): Settings {
       port: Number(value('PORT')),
       allowedHosts: value('ALLOWED_HOSTS').split(',').map(host => host.trim().toLowerCase()).filter(Boolean),
       tokenFile: expandHome(value('TOKEN_FILE')),
+      ordersEnabled: value('ORDERS_ENABLED') === 'true',
    }
 }

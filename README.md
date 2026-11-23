@@ -1,8 +1,8 @@
 # Saxo dashboard
 
-A single-page dashboard for a Saxo Bank account: balance, margin, positions, open orders, accounts and P/L, with a gauge that shows how close the account is to a margin call.
+A dashboard for a Saxo Bank account: balance, margin, positions, open orders, accounts and P/L, with a gauge that shows how close the account is to a margin call, and a page that places a ladder of limit orders.
 
-A small Hono server logs in to the Saxo OpenAPI with OAuth PKCE and refreshes the login in the background, so you only log in again when Saxo ends the session. The server only reads from Saxo: it never sends an order.
+A small Hono server logs in to the Saxo OpenAPI with OAuth PKCE and refreshes the login in the background, so you only log in again when Saxo ends the session.
 
 ## Margin gauge
 
@@ -16,6 +16,14 @@ The gauge shows Saxo's "margin and loan utilisation" (`MarginAndCollateralUtiliz
 | 100% or more | Close-out | Saxo may close positions and cancel open orders |
 
 The levels come from [Saxo's Lombard loan page](https://www.home.saxo/en-ch/accounts/lombard-loan). Other Saxo entities may use other levels.
+
+## Ladder orders
+
+The Ladder orders tab spreads limit orders evenly between a low and a high price and splits a total value or number of units equally between them. The low and high can also be levels of an underlying, such as Bitcoin for a Bitcoin ETN: each limit price is then the level times the instrument's current price divided by the underlying's.
+
+Prices are rounded to the instrument's tick size, down for buys and up for sells. The preview refuses orders that would fill immediately unless you allow them. Placing takes three steps: preview, a Saxo precheck of every order, and typing `place N` to confirm. Orders go out one per second, and placing stops at the first one Saxo refuses.
+
+The server sends no precheck and no order unless `ORDERS_ENABLED=true`.
 
 ## Saxo app
 
@@ -93,7 +101,8 @@ Then run `sudo nft -f /etc/nftables.conf`.
 | `PORT` | `8766` | |
 | `ALLOWED_HOSTS` | `localhost,127.0.0.1` | Host names the server answers to, which blocks DNS rebinding |
 | `TOKEN_FILE` | `~/.saxo-dashboard/tokens.json` | Saved login, readable only by its owner |
+| `ORDERS_ENABLED` | `false` | `true` lets the Ladder orders tab precheck and place orders |
 
 ## Security
 
-The saved login gives full access to the Saxo account for as long as it keeps being refreshed, including trading if the app allows it. Keep the server on a private network, and prefer a Saxo app without trading permission.
+The saved login gives full access to the Saxo account for as long as it keeps being refreshed, including trading if the app allows it. With `ORDERS_ENABLED=true`, anyone who can open the page can place orders. Keep the server on a private network that only your devices reach.
