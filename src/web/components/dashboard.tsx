@@ -1,7 +1,7 @@
 import { MarginGauge } from '@/components/margin-gauge'
 import { type Column, TableCard } from '@/components/table-card'
 import { ValueListCard, type ValueRow } from '@/components/value-list-card'
-import { money, percent, quantity, signClass } from '@/lib/format'
+import { date, money, moneyAndPercent, percent, quantity, signClass } from '@/lib/format'
 
 import type { AccountRow, CollateralRow, Dashboard as DashboardData, MarginRow, OrderRow, PositionRow } from '../../shared/dashboard.ts'
 
@@ -28,7 +28,8 @@ function profitLossRows({ profitLoss, client }: DashboardData): ValueRow[] {
    return [
       {
          label: 'Open positions, unrealized',
-         value: money(profitLoss.unrealized, client.decimals),
+         hint: 'At current prices, before trading costs. The percentage is of what the positions cost.',
+         value: moneyAndPercent(profitLoss.unrealized, profitLoss.unrealizedPct, client.decimals),
          className: signClass(profitLoss.unrealized),
       },
       ...(profitLoss.positionsWithoutBaseCurrencyProfitLoss
@@ -36,8 +37,9 @@ function profitLossRows({ profitLoss, client }: DashboardData): ValueRow[] {
          : []),
       allTime.ok
          ? {
-            label: `All time to ${allTime.value.thru} close, after trading costs`,
-            value: money(allTime.value.amount, client.decimals),
+            label: `All time to ${date(allTime.value.thru)} close`,
+            hint: 'After trading costs. The percentage is Saxo\'s time-weighted return.',
+            value: moneyAndPercent(allTime.value.amount, allTime.value.returnPct, client.decimals),
             className: signClass(allTime.value.amount),
          }
          : { label: 'All time', value: allTime.error },
@@ -91,6 +93,7 @@ const POSITION_COLUMNS: Column<PositionRow>[] = [
    { header: 'Current', cell: row => money(row.currentPrice, row.decimals), numeric: true },
    { header: 'Market value', cell: row => money(row.marketValue), numeric: true },
    { header: 'P/L', cell: row => money(row.profitLoss), numeric: true, className: row => signClass(row.profitLoss) },
+   { header: 'P/L %', cell: row => percent(row.profitLossPct, 2), numeric: true, className: row => signClass(row.profitLossPct) },
 ]
 
 const ORDER_COLUMNS: Column<OrderRow>[] = [

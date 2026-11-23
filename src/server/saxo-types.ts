@@ -66,7 +66,8 @@ export interface SaxoNetPosition {
    NetPositionView?: {
       AverageOpenPrice?: number
       CurrentPrice?: number
-      MarketValue?: number
+      MarketValueOpen?: number
+      MarketValueOpenInBaseCurrency?: number
       ProfitLossOnTrade?: number
       ProfitLossOnTradeInBaseCurrency?: number
    }
@@ -91,6 +92,10 @@ export interface SaxoPerformanceSummary {
    InceptionDay?: string
    From?: string
    Thru?: string
+}
+
+export interface SaxoPerformanceKeyFigures {
+   KeyFigures?: { ReturnFraction?: number }
 }
 
 export interface SaxoOrder {

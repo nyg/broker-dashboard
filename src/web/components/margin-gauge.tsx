@@ -80,7 +80,7 @@ export function MarginGauge({ margin, currency, decimals }: { margin: MarginSumm
                   <span className="absolute right-0">{CLOSE_OUT_PCT}%</span>
                </div>
             </div>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
                <dt className="text-muted-foreground">Margin utilisation</dt>
                <dd className="text-right tabular-nums">{percent(margin.marginUtilizationPct)}</dd>
                <dt className="text-muted-foreground">Collateral utilisation</dt>

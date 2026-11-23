@@ -76,6 +76,7 @@ export interface PositionRow {
    currentPrice: number | null
    marketValue: number | null
    profitLoss: number | null
+   profitLossPct: number | null
    profitLossInBaseCurrency: number | null
 }
 
@@ -93,12 +94,13 @@ export interface OrderRow {
 
 export interface AllTimeProfitLoss {
    amount: number | null
-   from: string
+   returnPct: number | null
    thru: string
 }
 
 export interface ProfitLossSummary {
    unrealized: number | null
+   unrealizedPct: number | null
    positionsWithoutBaseCurrencyProfitLoss: number
    allTime: Optional<AllTimeProfitLoss>
 }
