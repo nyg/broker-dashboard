@@ -36,7 +36,7 @@ function profitLossRows({ profitLoss, client }: DashboardData): ValueRow[] {
          : []),
       allTime.ok
          ? {
-            label: `All time, ${allTime.value.from} to ${allTime.value.thru}`,
+            label: `All time to ${allTime.value.thru} close, after trading costs`,
             value: money(allTime.value.amount, client.decimals),
             className: signClass(allTime.value.amount),
          }
