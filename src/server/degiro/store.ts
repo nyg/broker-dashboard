@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { DegiroSettings } from '../../shared/degiro.ts'
 import { writePrivateFile } from '../private-file.ts'
 
-export const EMPTY_SETTINGS: DegiroSettings = { profile: null, customCreditPct: null, creditOverrides: {} }
+export const EMPTY_SETTINGS: DegiroSettings = { profile: null, customCreditPct: null, creditOverrides: {}, portfolioRiskPct: null }
 
 export interface SavedStatement {
    csv: string

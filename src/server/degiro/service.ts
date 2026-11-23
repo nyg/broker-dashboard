@@ -21,6 +21,9 @@ export interface DegiroPrices {
 
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/
 
+// Short positions can make DEGIRO's portfolio risk several times the portfolio value.
+const MAX_PORTFOLIO_RISK_PCT = 1000
+
 function errorMessage(error: unknown) {
    return error instanceof Error ? error.message : String(error)
 }
@@ -46,21 +49,37 @@ function toPosition(holding: Holding, creditPct: number | null, creditOverridePc
    }
 }
 
-function toMargin(positions: DegiroPosition[], cash: number | null): DegiroMargin {
-   const collateralValue = sum(positions.map(position => position.collateralValue))
-   const loan = cash === null ? null : Math.max(0, -cash)
-   let utilizationPct: number | null = null
+function usedPct(loan: number | null, lendable: number) {
    if (loan === 0) {
-      utilizationPct = 0
-   } else if (loan !== null && collateralValue > 0) {
-      utilizationPct = 100 * loan / collateralValue
+      return 0
    }
+   return loan !== null && lendable > 0 ? 100 * loan / lendable : null
+}
+
+function higher(...values: (number | null)[]) {
+   const known = values.filter(value => value !== null)
+   return known.length ? Math.max(...known) : null
+}
+
+// DEGIRO runs two tests and calls a margin call when either fails: the credit test lends a share of
+// each position's value, and the margin test needs the positions plus cash to cover its portfolio risk.
+function toMargin(positions: DegiroPosition[], cash: number | null, portfolioRiskPct: number | null): DegiroMargin {
+   const positionsValue = sum(positions.map(position => position.value ?? 0))
+   const collateralValue = sum(positions.map(position => position.collateralValue))
+   const portfolioRisk = portfolioRiskPct === null ? null : positionsValue * portfolioRiskPct / 100
+   const loan = cash === null ? null : Math.max(0, -cash)
+   const creditUtilizationPct = usedPct(loan, collateralValue)
+   const marginUtilizationPct = portfolioRisk === null ? null : usedPct(loan, positionsValue - portfolioRisk)
    return {
-      utilizationPct,
+      utilizationPct: higher(creditUtilizationPct, marginUtilizationPct),
+      creditUtilizationPct,
+      marginUtilizationPct,
       loan,
-      positionsValue: sum(positions.map(position => position.value ?? 0)),
+      positionsValue,
       collateralValue,
-      freeSpace: cash === null ? null : collateralValue + cash,
+      creditSurplus: cash === null ? null : collateralValue + cash,
+      portfolioRisk,
+      marginSurplus: cash === null || portfolioRisk === null ? null : positionsValue + cash - portfolioRisk,
       positionsWithoutPrice: positions.filter(position => position.value === null).length,
       positionsWithoutCredit: positions.filter(position => position.creditPct === null).length,
    }
@@ -81,19 +100,20 @@ export function toDegiroDashboard(statement: Statement, settings: DegiroSettings
       profile: settings.profile,
       customCreditPct: settings.customCreditPct,
       defaultCreditPct: fallbackPct,
+      portfolioRiskPct: settings.portfolioRiskPct,
       cash,
       cashError: prices.cash.ok ? null : prices.cash.error,
       positions,
-      margin: toMargin(positions, cash),
+      margin: toMargin(positions, cash, settings.portfolioRiskPct),
    }
 }
 
-function percentOrNull(value: unknown) {
+function percentOrNull(value: unknown, name: string, max = 100) {
    if (value === null) {
       return null
    }
-   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
-      throw new DegiroInputError('The credit must be a percentage from 0 to 100.')
+   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > max) {
+      throw new DegiroInputError(`${name} must be a percentage from 0 to ${max}.`)
    }
    return value
 }
@@ -170,7 +190,10 @@ export class DegiroService {
          update.profile = profileOrNull(changes.profile)
       }
       if ('customCreditPct' in changes) {
-         update.customCreditPct = percentOrNull(changes.customCreditPct)
+         update.customCreditPct = percentOrNull(changes.customCreditPct, 'The credit')
+      }
+      if ('portfolioRiskPct' in changes) {
+         update.portfolioRiskPct = percentOrNull(changes.portfolioRiskPct, 'The portfolio risk', MAX_PORTFOLIO_RISK_PCT)
       }
       await this.#changeSettings(settings => ({ ...settings, ...update }))
    }
@@ -179,7 +202,7 @@ export class DegiroService {
       if (!ISIN.test(isin)) {
          throw new DegiroInputError(`${isin} is not an ISIN.`)
       }
-      const overridePct = percentOrNull(creditPct)
+      const overridePct = percentOrNull(creditPct, 'The credit')
       await this.#changeSettings(settings => {
          const others = Object.entries(settings.creditOverrides).filter(([key]) => key !== isin)
          return { ...settings, creditOverrides: Object.fromEntries(overridePct === null ? others : [...others, [isin, overridePct]]) }

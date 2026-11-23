@@ -96,7 +96,9 @@ export function uploadStatement(file: File) {
    return put('/api/degiro/statement', 'text/csv', file)
 }
 
-export function saveDegiroSettings(changes: Partial<Pick<DegiroSettings, 'profile' | 'customCreditPct'>>) {
+export type DegiroSettingsChange = Partial<Pick<DegiroSettings, 'profile' | 'customCreditPct' | 'portfolioRiskPct'>>
+
+export function saveDegiroSettings(changes: DegiroSettingsChange) {
    return put('/api/degiro/settings', 'application/json', JSON.stringify(changes))
 }
 

@@ -15,6 +15,7 @@ export interface DegiroSettings {
    profile: DegiroProfile | null
    customCreditPct: number | null
    creditOverrides: Record<string, number>
+   portfolioRiskPct: number | null
 }
 
 export function defaultCreditPct({ profile, customCreditPct }: Pick<DegiroSettings, 'profile' | 'customCreditPct'>) {
@@ -40,10 +41,14 @@ export interface DegiroPosition {
 
 export interface DegiroMargin {
    utilizationPct: number | null
+   creditUtilizationPct: number | null
+   marginUtilizationPct: number | null
    loan: number | null
    positionsValue: number
    collateralValue: number
-   freeSpace: number | null
+   creditSurplus: number | null
+   portfolioRisk: number | null
+   marginSurplus: number | null
    positionsWithoutPrice: number
    positionsWithoutCredit: number
 }
@@ -56,6 +61,7 @@ export interface DegiroDashboard {
    profile: DegiroProfile | null
    customCreditPct: number | null
    defaultCreditPct: number | null
+   portfolioRiskPct: number | null
    cash: number | null
    cashError: string | null
    positions: DegiroPosition[]

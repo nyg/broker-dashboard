@@ -78,13 +78,38 @@ describe('toDegiroDashboard', () => {
          .toEqual([[4000, 70, null, 2800], [1000, 0, 0, 0]])
       expect(margin).toEqual({
          utilizationPct: 50,
+         creditUtilizationPct: 50,
+         marginUtilizationPct: null,
          loan: 1400,
          positionsValue: 5000,
          collateralValue: 2800,
-         freeSpace: 1400,
+         creditSurplus: 1400,
+         portfolioRisk: null,
+         marginSurplus: null,
          positionsWithoutPrice: 0,
          positionsWithoutCredit: 0,
       })
+   })
+
+   it('shows the tighter of the credit and the portfolio risk tests', () => {
+      // When
+      const { margin } = toDegiroDashboard(
+         STATEMENT_DATA,
+         settings({ profile: 'basic', portfolioRiskPct: 40 }),
+         { quotes: new Map([['CH1416135338', quote(40)], ['IE00B4K48X80', quote(100)]]), cash: { ok: true, value: -1400 } },
+         new Date(0),
+         new Date(0),
+      )
+
+      // Then
+      expect(margin).toMatchObject({
+         creditUtilizationPct: 40,
+         creditSurplus: 2100,
+         portfolioRisk: 2000,
+         marginSurplus: 1600,
+      })
+      expect(margin.marginUtilizationPct).toBeCloseTo(1400 / 3000 * 100)
+      expect(margin.utilizationPct).toBe(margin.marginUtilizationPct)
    })
 
    it.each([
@@ -128,7 +153,7 @@ describe('toDegiroDashboard', () => {
       const { margin } = toDegiroDashboard(STATEMENT_DATA, EMPTY_SETTINGS, { quotes: new Map(), cash: { ok: true, value: 250 } }, new Date(0), new Date(0))
 
       // Then
-      expect(margin).toMatchObject({ utilizationPct: 0, loan: 0, freeSpace: 250 })
+      expect(margin).toMatchObject({ utilizationPct: 0, loan: 0, creditSurplus: 250 })
    })
 })
 
@@ -178,10 +203,10 @@ describe('DegiroService', () => {
       const store = new MemoryStore(STATEMENT, { profile: 'basic', creditOverrides: { IE00B4K48X80: 0 } })
 
       // When
-      await service(store).updateSettings({ profile: 'custom', customCreditPct: 60 })
+      await service(store).updateSettings({ profile: 'custom', customCreditPct: 60, portfolioRiskPct: 150 })
 
       // Then
-      expect(store.settings).toEqual({ profile: 'custom', customCreditPct: 60, creditOverrides: { IE00B4K48X80: 0 } })
+      expect(store.settings).toEqual({ profile: 'custom', customCreditPct: 60, creditOverrides: { IE00B4K48X80: 0 }, portfolioRiskPct: 150 })
    })
 
    it('sets and clears credit overrides', async () => {
@@ -193,7 +218,7 @@ describe('DegiroService', () => {
       await Promise.all([degiro.setCreditOverride('IE00B4K48X80', 0), degiro.setCreditOverride('CH1416135338', null)])
 
       // Then
-      expect(store.settings).toEqual({ profile: 'basic', customCreditPct: null, creditOverrides: { IE00B4K48X80: 0 } })
+      expect(store.settings).toEqual({ profile: 'basic', customCreditPct: null, creditOverrides: { IE00B4K48X80: 0 }, portfolioRiskPct: null })
    })
 
    it.each([[-1], [101], ['20'], [Number.NaN]])('refuses %s as a credit percentage', async creditPct => {
@@ -203,6 +228,14 @@ describe('DegiroService', () => {
 
       // Then
       await expect(set).rejects.toThrow(DegiroInputError)
+      await expect(update).rejects.toThrow(DegiroInputError)
+   })
+
+   it.each([[-1], [1001], ['36.7']])('refuses %s as a portfolio risk percentage', async portfolioRiskPct => {
+      // When
+      const update = service(new MemoryStore(STATEMENT)).updateSettings({ portfolioRiskPct })
+
+      // Then
       await expect(update).rejects.toThrow(DegiroInputError)
    })
 

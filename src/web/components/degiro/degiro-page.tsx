@@ -12,24 +12,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { ValueListCard, type ValueRow } from '@/components/value-list-card'
 import type { Polled } from '@/hooks/use-polling'
-import { saveDegiroSettings, setCreditOverride, uploadStatement } from '@/lib/api'
-import { date, money, quantity } from '@/lib/format'
+import { type DegiroSettingsChange, saveDegiroSettings, setCreditOverride, uploadStatement } from '@/lib/api'
+import { date, money, percent, quantity } from '@/lib/format'
 
 import {
    DEGIRO_PROFILES,
    type DegiroDashboard,
    type DegiroPosition,
    type DegiroProfile,
-   type DegiroSettings,
    PROFILE_CREDIT_PCT,
 } from '../../../shared/degiro.ts'
 import { CLOSE_OUT_PCT, MARGIN_CALL_PCT, WATCH_PCT } from '../../../shared/margin.ts'
 
 const DEGIRO_LEVELS: GaugeLevels = {
-   'safe': { label: 'Safe', text: `Far from a margin call, which DEGIRO makes at ${CLOSE_OUT_PCT}%, when free space turns negative.` },
-   'watch': { label: 'Watch', text: `Above ${WATCH_PCT}%. DEGIRO makes a margin call at ${CLOSE_OUT_PCT}%, when free space turns negative.` },
-   'margin-call': { label: 'Near a call', text: `Above ${MARGIN_CALL_PCT}%. At ${CLOSE_OUT_PCT}% free space turns negative and DEGIRO makes a margin call.` },
-   'close-out': { label: 'Margin call', text: 'Free space is negative: DEGIRO asks you to add money or sell, and may sell positions itself.' },
+   'safe': { label: 'Safe', text: `Far from a margin call, which DEGIRO makes at ${CLOSE_OUT_PCT}%, when the credit or margin surplus turns negative.` },
+   'watch': { label: 'Watch', text: `Above ${WATCH_PCT}%. DEGIRO makes a margin call at ${CLOSE_OUT_PCT}%, when the credit or margin surplus turns negative.` },
+   'margin-call': { label: 'Near a call', text: `Above ${MARGIN_CALL_PCT}%. At ${CLOSE_OUT_PCT}% a surplus turns negative and DEGIRO makes a margin call.` },
+   'close-out': { label: 'Margin call', text: 'A surplus is negative: DEGIRO asks you to add money or sell, and may sell positions itself.' },
    'unknown': { label: 'Unknown', text: 'Not enough prices or credit percentages to estimate it.' },
 }
 
@@ -107,11 +106,12 @@ interface PercentInputProps {
    label: string
    value: number | null
    placeholder?: string
+   max?: number
    onSave: (value: number | null) => Promise<void>
    className?: string
 }
 
-function PercentInput({ id, label, value, placeholder = '–', onSave, className }: PercentInputProps) {
+function PercentInput({ id, label, value, placeholder = '–', max = 100, onSave, className }: PercentInputProps) {
    const [error, setError] = useState<string | null>(null)
 
    async function save(text: string) {
@@ -133,7 +133,7 @@ function PercentInput({ id, label, value, placeholder = '–', onSave, className
          type="number"
          inputMode="decimal"
          min={0}
-         max={100}
+         max={max}
          step="any"
          defaultValue={value ?? ''}
          placeholder={placeholder}
@@ -151,10 +151,10 @@ function PercentInput({ id, label, value, placeholder = '–', onSave, className
    )
 }
 
-function CreditCard({ dashboard, onSaved }: { dashboard: DegiroDashboard, onSaved: () => void }) {
+function SettingsCard({ dashboard, onSaved }: { dashboard: DegiroDashboard, onSaved: () => void }) {
    const [error, setError] = useState<string | null>(null)
 
-   async function save(changes: Partial<Pick<DegiroSettings, 'profile' | 'customCreditPct'>>) {
+   async function save(changes: DegiroSettingsChange) {
       try {
          await saveDegiroSettings(changes)
          setError(null)
@@ -168,9 +168,9 @@ function CreditCard({ dashboard, onSaved }: { dashboard: DegiroDashboard, onSave
    return (
       <Card>
          <CardHeader>
-            <CardTitle>Credit</CardTitle>
+            <CardTitle>Margin settings</CardTitle>
             <CardDescription>
-               DEGIRO lends against a share of each position&apos;s value, set by your account profile. DEGIRO shows the result under Available to trade, as Collateral value.
+               Copy them from DEGIRO&apos;s Available to trade: the profile sets the Collateral value, and the portfolio risk is Portfolio Risk divided by Value of portfolio.
             </CardDescription>
          </CardHeader>
          <CardContent className="space-y-3">
@@ -197,6 +197,18 @@ function CreditCard({ dashboard, onSaved }: { dashboard: DegiroDashboard, onSave
                   />
                </div>
             )}
+            <div className="grid gap-1.5">
+               <Label htmlFor="degiro-portfolio-risk">Portfolio risk, % of portfolio value</Label>
+               <PercentInput
+                  key={dashboard.portfolioRiskPct}
+                  id="degiro-portfolio-risk"
+                  label="Portfolio risk, in percent of portfolio value"
+                  value={dashboard.portfolioRiskPct}
+                  placeholder="not set"
+                  max={1000}
+                  onSave={portfolioRiskPct => save({ portfolioRiskPct })}
+               />
+            </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
          </CardContent>
       </Card>
@@ -253,19 +265,23 @@ function positionColumns(defaultCreditPct: number | null, onSaved: () => void): 
 }
 
 function accountRows({ margin, cash, cashError }: DegiroDashboard): ValueRow[] {
+   const surplusClass = (value: number | null) => (value !== null && value < 0 ? 'text-danger' : undefined)
    return [
-      { label: 'Cash', value: cashError ? 'unknown' : money(cash), hint: cashError ?? undefined },
-      { label: 'Positions value', value: money(margin.positionsValue) },
+      { label: 'Value of portfolio', value: money(margin.positionsValue) },
+      { label: 'Cash balance', value: cashError ? 'unknown' : money(cash), hint: cashError ?? undefined },
+      { label: 'Collateral value', value: money(margin.collateralValue), hint: 'The share of each position\'s value DEGIRO lends against.' },
       {
-         label: 'Collateral value',
-         value: money(margin.collateralValue),
-         hint: 'The share of each position\'s value DEGIRO lends against.',
+         label: 'Credit surplus',
+         value: money(margin.creditSurplus),
+         hint: 'Collateral value plus cash balance.',
+         className: surplusClass(margin.creditSurplus),
       },
+      { label: 'Portfolio risk', value: money(margin.portfolioRisk), hint: 'Value of portfolio times the portfolio risk percentage you set.' },
       {
-         label: 'Free space',
-         value: money(margin.freeSpace),
-         hint: 'Collateral value plus cash. DEGIRO makes a margin call when it turns negative.',
-         className: margin.freeSpace !== null && margin.freeSpace < 0 ? 'text-danger' : undefined,
+         label: 'Margin surplus',
+         value: money(margin.marginSurplus),
+         hint: 'Value of portfolio plus cash balance, less portfolio risk.',
+         className: surplusClass(margin.marginSurplus),
       },
    ]
 }
@@ -328,17 +344,18 @@ export function DegiroPage({ state }: { state: Polled<{ dashboard: DegiroDashboa
          <Warnings dashboard={dashboard} />
          <div className="grid items-start gap-4 lg:grid-cols-3">
             <MarginGauge
-               title="Loan to collateral, estimated"
+               title="Loan used, estimated"
                value={margin.utilizationPct}
                levels={DEGIRO_LEVELS}
                figures={[
+                  { label: 'Credit test', value: percent(margin.creditUtilizationPct) },
+                  { label: 'Margin test', value: dashboard.portfolioRiskPct === null ? 'set the portfolio risk' : percent(margin.marginUtilizationPct) },
                   { label: `Loan (${currency})`, value: money(margin.loan) },
-                  { label: `Collateral value (${currency})`, value: money(margin.collateralValue) },
                ]}
             />
             <ValueListCard title={`Account (${currency})`} rows={accountRows(dashboard)} />
             <div className="grid gap-4">
-               <CreditCard dashboard={dashboard} onSaved={reload} />
+               <SettingsCard dashboard={dashboard} onSaved={reload} />
                <StatementCard dashboard={dashboard} onUploaded={reload} />
             </div>
          </div>
