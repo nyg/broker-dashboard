@@ -2,6 +2,8 @@
 
 Run `pnpm lint`, `pnpm typecheck` and `pnpm test` after a change. Setup, deployment and settings are in the README.
 
+`master` takes changes only through squash-merged pull requests, with titles in Conventional Commits form.
+
 ## Layout
 
 - `src/server`: Hono server, run by Node.js straight from the TypeScript sources (type stripping), so relative imports end in `.ts`, path aliases do not resolve, and only erasable syntax works.
@@ -20,5 +22,6 @@ Orders pass three gates, each kept on purpose: `ORDERS_ENABLED`, a clean Saxo pr
 - Every refresh rotates the refresh token, and the refresh request carries the PKCE `code_verifier` again.
 - Saxo refuses an identical POST within 15 seconds unless `X-Request-ID` differs, and allows one order request per second per session (`ORDER_INTERVAL_MS`).
 - Errors can arrive in `ErrorInfo` with HTTP 200, even with `PreCheckResult: Ok`.
+- Without a price feed for an instrument, a net position comes back with `CurrentPrice: 0` and no market value, while its P/L is still filled in: `positionValues` rebuilds both.
 - Prices go through `priceOnTick` with big.js: a tick scheme's bands differ, and a price rounded with one band's tick can land in a lower band.
 - The margin gauge's 50 / 75 / 100% levels come from Saxo Switzerland's Lombard loan page, linked in `src/shared/margin.ts`.

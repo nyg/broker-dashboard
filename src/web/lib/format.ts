@@ -10,6 +10,14 @@ export function percent(value: number | null, decimals = 1) {
    return value === null ? '–' : `${decimalFormat(decimals).format(value)}%`
 }
 
+export function moneyAndPercent(value: number | null, pct: number | null, decimals = 2) {
+   return pct === null ? money(value, decimals) : `${money(value, decimals)} (${percent(pct, 2)})`
+}
+
+export function date(isoDate: string) {
+   return new Date(`${isoDate}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 export function quantity(value: number | null) {
    return value === null ? '–' : new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(value)
 }

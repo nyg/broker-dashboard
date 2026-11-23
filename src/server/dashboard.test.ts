@@ -16,6 +16,7 @@ function snapshot(balance: SaxoBalance): SaxoSnapshot {
       ],
       marginOverview: { ok: false, error: 'unavailable (HTTP 404)' },
       performance: { ok: true, value: { AccumulatedProfitLoss: 900, InceptionDay: '2025-03-17T00:00:00Z', Thru: '2026-11-22T00:00:00Z' } },
+      keyFigures: { ok: true, value: { KeyFigures: { ReturnFraction: -0.0424 } } },
       orders: [],
    }
 }
@@ -57,8 +58,9 @@ describe('toDashboard', () => {
       // Then
       expect(profitLoss).toEqual({
          unrealized: 100,
+         unrealizedPct: null,
          positionsWithoutBaseCurrencyProfitLoss: 1,
-         allTime: { ok: true, value: { amount: 900, from: '2025-03-17', thru: '2026-11-22' } },
+         allTime: { ok: true, value: { amount: 900, returnPct: -4.24, thru: '2026-11-22' } },
       })
    })
 
@@ -72,5 +74,30 @@ describe('toDashboard', () => {
 
       // Then
       expect(collateral).toEqual([{ symbol: 'XNAS:xswx', description: 'Xtrackers NASDAQ 100', marketValue: 5549.25, collateralValue: 5284.55 }])
+   })
+
+   it('rebuilds the price and market value Saxo leaves out without a price feed', () => {
+      // Given
+      const data = snapshot({})
+      data.positions = [{
+         NetPositionBase: { Amount: 921 },
+         NetPositionView: {
+            AverageOpenPrice: 5.434,
+            CurrentPrice: 0,
+            MarketValueOpen: -5004.71,
+            MarketValueOpenInBaseCurrency: -5004.71,
+            ProfitLossOnTrade: -143.68,
+            ProfitLossOnTradeInBaseCurrency: -143.68,
+         },
+      }]
+
+      // When
+      const { positions: [position], profitLoss } = toDashboard(data, new Date(0))
+
+      // Then
+      expect(position.currentPrice).toBeCloseTo(5.278, 3)
+      expect(position.marketValue).toBeCloseTo(4861.03, 2)
+      expect(position.profitLossPct).toBeCloseTo(-2.871, 3)
+      expect(profitLoss.unrealizedPct).toBeCloseTo(-2.871, 3)
    })
 })

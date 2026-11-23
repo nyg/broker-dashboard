@@ -8,6 +8,7 @@ import type {
    SaxoMarginOverview,
    SaxoNetPosition,
    SaxoOrder,
+   SaxoPerformanceKeyFigures,
    SaxoPerformanceSummary,
    SaxoUser,
 } from './saxo-types.ts'
@@ -22,6 +23,7 @@ export interface SaxoSnapshot {
    positions: SaxoNetPosition[]
    marginOverview: Optional<SaxoMarginOverview>
    performance: Optional<SaxoPerformanceSummary>
+   keyFigures: Optional<SaxoPerformanceKeyFigures>
    orders: SaxoOrder[]
 }
 
@@ -42,19 +44,20 @@ export async function fetchSnapshot(api: SaxoApi): Promise<SaxoSnapshot> {
       api.get<SaxoClient>('/port/v1/clients/me'),
    ])
    const byClient: Query = { ClientKey: client.ClientKey }
-   const [balance, accounts, positions, marginOverview, performance, orders] = await Promise.all([
+   const [balance, accounts, positions, marginOverview, performance, keyFigures, orders] = await Promise.all([
       api.get<SaxoBalance>('/port/v1/balances/me'),
       api.getAll<SaxoAccount>('/port/v1/accounts/me'),
       api.getAll<SaxoNetPosition>('/port/v1/netpositions/me', { FieldGroups: POSITION_FIELD_GROUPS }),
       optional(api.get<SaxoMarginOverview>('/port/v1/balances/marginoverview', byClient)),
       optional(api.get<SaxoPerformanceSummary>('/hist/v4/performance/summary', { ...byClient, StandardPeriod: 'AllTime' })),
+      optional(api.get<SaxoPerformanceKeyFigures>('/hist/v4/performance/timeseries', { ...byClient, StandardPeriod: 'AllTime', FieldGroups: 'KeyFigures' })),
       api.getAll<SaxoOrder>('/port/v1/orders/me', { FieldGroups: 'DisplayAndFormat' }),
    ])
    const accountBalances = await Promise.all(accounts.map(async account => ({
       account,
       balance: await api.get<SaxoBalance>('/port/v1/balances', { ...byClient, AccountKey: account.AccountKey }),
    })))
-   return { user, client, balance, accounts: accountBalances, positions, marginOverview, performance, orders }
+   return { user, client, balance, accounts: accountBalances, positions, marginOverview, performance, keyFigures, orders }
 }
 
 function number(value: unknown) {
@@ -74,8 +77,46 @@ function marginRows(overview: SaxoMarginOverview): MarginRow[] {
    ])
 }
 
+function sum(values: number[]) {
+   return values.reduce((total, value) => total + value, 0)
+}
+
+function percentOf(fraction: number | null) {
+   return fraction === null ? null : fraction * 100
+}
+
+// Saxo returns CurrentPrice 0 and no market value when the account has no price feed for the
+// instrument, yet still values the position: rebuild both from the opening value and the P/L.
+function positionValues(position: SaxoNetPosition) {
+   const view = position.NetPositionView ?? {}
+   const amount = number(position.NetPositionBase?.Amount)
+   const averageOpenPrice = number(view.AverageOpenPrice)
+   const profitLoss = number(view.ProfitLossOnTrade)
+   const openValue = number(view.MarketValueOpen)
+   const costBasis = openValue === null ? null : -openValue
+   const quotedPrice = number(view.CurrentPrice)
+   const derivedPrice = amount && averageOpenPrice !== null && profitLoss !== null ? averageOpenPrice + profitLoss / amount : null
+   return {
+      averageOpenPrice,
+      currentPrice: quotedPrice ? quotedPrice : derivedPrice,
+      marketValue: costBasis !== null && profitLoss !== null ? costBasis + profitLoss : null,
+      profitLoss,
+      profitLossPct: costBasis && profitLoss !== null ? 100 * profitLoss / Math.abs(costBasis) : null,
+   }
+}
+
+function unrealizedPct(positions: SaxoNetPosition[]) {
+   const valued = positions.flatMap(position => {
+      const profitLoss = number(position.NetPositionView?.ProfitLossOnTradeInBaseCurrency)
+      const openValue = number(position.NetPositionView?.MarketValueOpenInBaseCurrency)
+      return profitLoss === null || openValue === null ? [] : [{ profitLoss, cost: Math.abs(openValue) }]
+   })
+   const cost = sum(valued.map(item => item.cost))
+   return cost ? 100 * sum(valued.map(item => item.profitLoss)) / cost : null
+}
+
 export function toDashboard(snapshot: SaxoSnapshot, fetchedAt: Date): Dashboard {
-   const { balance, performance, marginOverview } = snapshot
+   const { balance, performance, keyFigures, marginOverview } = snapshot
    const positionsBasePnl = snapshot.positions.map(position => number(position.NetPositionView?.ProfitLossOnTradeInBaseCurrency))
    const knownBasePnl = positionsBasePnl.filter(value => value !== null)
    const marginUtilizationPct = number(balance.MarginUtilizationPct)
@@ -136,21 +177,19 @@ export function toDashboard(snapshot: SaxoSnapshot, fetchedAt: Date): Dashboard 
          amount: number(position.NetPositionBase?.Amount),
          currency: position.DisplayAndFormat?.Currency ?? '',
          decimals: position.DisplayAndFormat?.Decimals ?? 2,
-         averageOpenPrice: number(position.NetPositionView?.AverageOpenPrice),
-         currentPrice: number(position.NetPositionView?.CurrentPrice),
-         marketValue: number(position.NetPositionView?.MarketValue),
-         profitLoss: number(position.NetPositionView?.ProfitLossOnTrade),
+         ...positionValues(position),
          profitLossInBaseCurrency: number(position.NetPositionView?.ProfitLossOnTradeInBaseCurrency),
       })),
       profitLoss: {
-         unrealized: knownBasePnl.length ? knownBasePnl.reduce((sum, value) => sum + value, 0) : null,
+         unrealized: knownBasePnl.length ? sum(knownBasePnl) : null,
+         unrealizedPct: unrealizedPct(snapshot.positions),
          positionsWithoutBaseCurrencyProfitLoss: positionsBasePnl.length - knownBasePnl.length,
          allTime: performance.ok
             ? {
                ok: true,
                value: {
                   amount: number(performance.value.AccumulatedProfitLoss),
-                  from: (performance.value.InceptionDay ?? performance.value.From ?? '').slice(0, 10),
+                  returnPct: keyFigures.ok ? percentOf(number(keyFigures.value.KeyFigures?.ReturnFraction)) : null,
                   thru: (performance.value.Thru ?? '').slice(0, 10),
                },
             }
