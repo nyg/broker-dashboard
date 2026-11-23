@@ -19,7 +19,9 @@ The levels come from [Saxo's Lombard loan page](https://www.home.saxo/en-ch/acco
 
 ## Saxo app
 
-Create a live app on the [Saxo developer portal](https://www.developer.saxo/openapi/appmanagement) with the PKCE grant type. Register one redirect URL per address you open the dashboard on, without a port, for example `http://localhost/callback` and `http://192.168.1.10/callback`. Saxo accepts any port at login time.
+Create a live app on the [Saxo developer portal](https://www.developer.saxo/openapi/appmanagement) with the PKCE grant type. Register one redirect URL per address you open the dashboard on, without a port, for example `http://localhost/callback` and `http://192.168.1.10/callback`.
+
+Saxo accepts any port at login time only on `localhost`. Any other address must match exactly, so the server sends Saxo its callback URL without a port, and it must also be reachable on port 80. See [Port 80](#port-80).
 
 ## Development
 
@@ -60,6 +62,24 @@ systemctl --user enable --now saxo-dashboard
 ```
 
 `deploy/start` finds Node.js through nvm; change it if Node.js is installed another way. Run `loginctl enable-linger` once so the service keeps running when you are logged out.
+
+### Port 80
+
+The login callback arrives on port 80. A user service cannot listen on it, so forward port 80 to the server's port with nftables, for example in `/etc/nftables.conf`:
+
+```
+table ip saxo_dashboard
+flush table ip saxo_dashboard
+
+table ip saxo_dashboard {
+	chain prerouting {
+		type nat hook prerouting priority dstnat; policy accept;
+		tcp dport 80 redirect to :8766
+	}
+}
+```
+
+Then run `sudo nft -f /etc/nftables.conf`.
 
 ## Configuration
 

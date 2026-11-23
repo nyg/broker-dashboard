@@ -23,6 +23,18 @@ function allowedHostsOnly(allowedHosts: string[]): MiddlewareHandler {
    }
 }
 
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]']
+
+// Saxo accepts any port in a PKCE redirect URL only on localhost; any other host must match the
+// registered URL exactly, which has no port, so the server must also be reachable on port 80.
+export function callbackUrl(requestUrl: string) {
+   const url = new URL('/callback', requestUrl)
+   if (!LOOPBACK_HOSTS.includes(url.hostname)) {
+      url.port = ''
+   }
+   return url.toString()
+}
+
 function errorMessage(error: unknown) {
    return error instanceof Error ? error.message : String(error)
 }
@@ -34,7 +46,7 @@ export function createApp({ allowedHosts, session, loadDashboard, staticRoot }: 
 
    app.get('/api/session', c => c.json(session.status()))
 
-   app.get('/api/login', c => c.redirect(session.beginLogin(`${new URL(c.req.url).origin}/callback`)))
+   app.get('/api/login', c => c.redirect(session.beginLogin(callbackUrl(c.req.url))))
 
    app.get('/callback', async c => {
       const { code, state, error, error_description: description } = c.req.query()

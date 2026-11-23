@@ -1,15 +1,30 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createApp } from './app.ts'
+import { callbackUrl, createApp } from './app.ts'
 import type { Session } from './session.ts'
 
 function app() {
    const session = {
       status: () => ({ loggedIn: false, accessExpiresAt: null, refreshExpiresAt: null, refreshedAt: null, error: null }),
       logout: vi.fn(async () => {}),
+      beginLogin: vi.fn((redirectUri: string) => `https://saxo.test/authorize?redirect_uri=${redirectUri}`),
    } as unknown as Session
    return { session, app: createApp({ allowedHosts: ['192.168.1.133'], session, loadDashboard: vi.fn() }) }
 }
+
+describe('callbackUrl', () => {
+   it.each([
+      ['http://192.168.1.133:8766/api/login', 'http://192.168.1.133/callback'],
+      ['http://192.168.1.133/api/login', 'http://192.168.1.133/callback'],
+      ['http://localhost:5173/api/login', 'http://localhost:5173/callback'],
+   ])('turns %s into %s', (requestUrl, expected) => {
+      // When
+      const result = callbackUrl(requestUrl)
+
+      // Then
+      expect(result).toBe(expected)
+   })
+})
 
 describe('createApp', () => {
    it('answers on an allowed host', async () => {
@@ -49,5 +64,14 @@ describe('createApp', () => {
       // Then
       expect(response.status).toBe(403)
       expect(session.logout).not.toHaveBeenCalled()
+   })
+
+   it('sends the login to Saxo with the registered callback URL', async () => {
+      // When
+      const response = await app().app.request('http://192.168.1.133:8766/api/login')
+
+      // Then
+      expect(response.status).toBe(302)
+      expect(response.headers.get('location')).toBe('https://saxo.test/authorize?redirect_uri=http://192.168.1.133/callback')
    })
 })

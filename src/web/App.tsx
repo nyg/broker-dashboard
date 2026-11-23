@@ -14,7 +14,7 @@ const SESSION_INTERVAL_MS = 30_000
 
 function LoginCard({ error }: { error: string | null }) {
    return (
-      <Card className="mx-auto mt-16 max-w-md">
+      <Card className="mx-auto mt-16 w-full max-w-lg">
          <CardHeader>
             <CardTitle>Log in to Saxo</CardTitle>
             <CardDescription>
