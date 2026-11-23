@@ -1,5 +1,5 @@
-import type { Dashboard, MarginRow, Optional } from '../shared/dashboard.ts'
-import { marginAndLoanUtilization } from '../shared/margin.ts'
+import type { Dashboard, MarginRow, Optional } from '../../shared/dashboard.ts'
+import { marginAndLoanUtilization } from '../../shared/margin.ts'
 import { type Query, type SaxoApi,SaxoApiError } from './saxo-api.ts'
 import type {
    SaxoAccount,

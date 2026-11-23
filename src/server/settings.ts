@@ -11,6 +11,7 @@ export interface Settings {
    allowedHosts: string[]
    tokenFile: string
    ordersEnabled: boolean
+   degiroFolder: string
 }
 
 const DEFAULTS = {
@@ -20,8 +21,9 @@ const DEFAULTS = {
    HOST: '127.0.0.1',
    PORT: '8766',
    ALLOWED_HOSTS: 'localhost,127.0.0.1',
-   TOKEN_FILE: '~/.saxo-dashboard/tokens.json',
+   TOKEN_FILE: '~/.broker-dashboard/saxo-tokens.json',
    ORDERS_ENABLED: 'false',
+   DEGIRO_FOLDER: '~/.broker-dashboard/degiro',
 }
 
 type Name = keyof typeof DEFAULTS | 'SAXO_APP_KEY'
@@ -46,5 +48,6 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env): Settings {
       allowedHosts: value('ALLOWED_HOSTS').split(',').map(host => host.trim().toLowerCase()).filter(Boolean),
       tokenFile: expandHome(value('TOKEN_FILE')),
       ordersEnabled: value('ORDERS_ENABLED') === 'true',
+      degiroFolder: expandHome(value('DEGIRO_FOLDER')),
    }
 }

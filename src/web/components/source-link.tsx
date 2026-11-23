@@ -1,7 +1,7 @@
 import { GitHubMark } from '@/components/github-mark'
 import { Button } from '@/components/ui/button'
 
-const SOURCE_URL = 'https://github.com/nyg/saxo-dashboard'
+const SOURCE_URL = 'https://github.com/nyg/broker-dashboard'
 const LABEL = 'Source code on GitHub'
 
 export function SourceLink() {

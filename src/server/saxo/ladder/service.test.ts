@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { LadderRequest } from '../../shared/ladder.ts'
+import type { LadderRequest } from '../../../shared/ladder.ts'
 import { SaxoApiError } from '../saxo-api.ts'
 import { type LadderApi, LadderService, parseLadderRequest } from './service.ts'
 

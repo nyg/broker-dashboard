@@ -1,16 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { callbackUrl, createApp } from './app.ts'
-import type { LadderService } from './ladder/service.ts'
-import type { Session } from './session.ts'
+import { DegiroInputError, type DegiroService } from './degiro/service.ts'
+import type { LadderService } from './saxo/ladder/service.ts'
+import type { Session } from './saxo/session.ts'
 
-function app() {
+function app(degiro: Partial<DegiroService> = {}) {
    const session = {
       status: () => ({ loggedIn: false, accessExpiresAt: null, refreshExpiresAt: null, refreshedAt: null, error: null }),
       logout: vi.fn(async () => {}),
       beginLogin: vi.fn((redirectUri: string) => `https://saxo.test/authorize?redirect_uri=${redirectUri}`),
    } as unknown as Session
-   return { session, app: createApp({ allowedHosts: ['192.168.1.133'], session, loadDashboard: vi.fn(), ladder: {} as LadderService }) }
+   return { session, app: createApp({ allowedHosts: ['192.168.1.133'], session, loadDashboard: vi.fn(), ladder: {} as LadderService, degiro: degiro as DegiroService }) }
 }
 
 describe('callbackUrl', () => {
@@ -74,5 +75,76 @@ describe('createApp', () => {
       // Then
       expect(response.status).toBe(302)
       expect(response.headers.get('location')).toBe('https://saxo.test/authorize?redirect_uri=http://192.168.1.133/callback')
+   })
+})
+
+describe('DEGIRO routes', () => {
+   const statementUrl = 'http://192.168.1.133:8766/api/degiro/statement'
+
+   it('saves a statement sent as CSV', async () => {
+      // Given
+      const saveStatement = vi.fn(async () => {})
+
+      // When
+      const response = await app({ saveStatement }).app.request(statementUrl, {
+         method: 'PUT',
+         headers: { 'Content-Type': 'text/csv' },
+         body: 'Date,Time',
+      })
+
+      // Then
+      expect(response.status).toBe(200)
+      expect(saveStatement).toHaveBeenCalledWith('Date,Time')
+   })
+
+   it('refuses a statement sent as plain text, which a cross-site form could send', async () => {
+      // Given
+      const saveStatement = vi.fn(async () => {})
+
+      // When
+      const response = await app({ saveStatement }).app.request(statementUrl, {
+         method: 'PUT',
+         headers: { 'Content-Type': 'text/plain', 'Origin': 'http://192.168.1.133:8766' },
+         body: 'Date,Time',
+      })
+
+      // Then
+      expect(response.status).toBe(400)
+      expect(saveStatement).not.toHaveBeenCalled()
+   })
+
+   it('refuses a statement over 5 MB', async () => {
+      // Given
+      const saveStatement = vi.fn(async () => {})
+
+      // When
+      const response = await app({ saveStatement }).app.request(statementUrl, {
+         method: 'PUT',
+         headers: { 'Content-Type': 'text/csv' },
+         body: 'x'.repeat(5 * 1024 * 1024 + 1),
+      })
+
+      // Then
+      expect(response.status).toBe(413)
+      expect(saveStatement).not.toHaveBeenCalled()
+   })
+
+   it('answers 400 with the reason when the service refuses the input', async () => {
+      // Given
+      const setHaircut = vi.fn(async () => {
+         throw new DegiroInputError('The haircut must be a percentage from 0 to 100.')
+      })
+
+      // When
+      const response = await app({ setHaircut }).app.request('http://192.168.1.133:8766/api/degiro/haircuts/IE00B4K48X80', {
+         method: 'PUT',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ haircutPct: 120 }),
+      })
+
+      // Then
+      expect(response.status).toBe(400)
+      expect(await response.json()).toEqual({ error: 'The haircut must be a percentage from 0 to 100.' })
+      expect(setHaircut).toHaveBeenCalledWith('IE00B4K48X80', 120)
    })
 })

@@ -19,10 +19,10 @@ export function AppHeader({ client, session, fetchedAt, onReload, onLogout }: Ap
    return (
       <header className="flex flex-wrap items-center justify-between gap-3">
          <div>
-            <h1 className="text-xl font-semibold">{client?.name || 'Saxo dashboard'}</h1>
+            <h1 className="text-xl font-semibold">Broker dashboard</h1>
             {client && (
                <p className="text-sm text-muted-foreground">
-                  Client {client.clientId}, default currency {client.currency}
+                  Saxo: {client.name}, client {client.clientId}, default currency {client.currency}
                </p>
             )}
          </div>

@@ -1,5 +1,6 @@
-import { mkdir, open, readFile, rename, rm } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { readFile, rm } from 'node:fs/promises'
+
+import { writePrivateFile } from '../private-file.ts'
 
 export interface StoredTokens {
    appKey: string
@@ -28,15 +29,7 @@ export function fileTokenStore(path: string): TokenStore {
          }
       },
       async save(tokens) {
-         await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-         const temporary = `${path}.tmp`
-         const file = await open(temporary, 'w', 0o600)
-         try {
-            await file.writeFile(JSON.stringify(tokens))
-         } finally {
-            await file.close()
-         }
-         await rename(temporary, path)
+         await writePrivateFile(path, JSON.stringify(tokens))
       },
       async clear() {
          await rm(path, { force: true })

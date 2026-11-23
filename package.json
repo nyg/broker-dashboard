@@ -1,5 +1,5 @@
 {
-  "name": "saxo-dashboard",
+  "name": "broker-dashboard",
   "private": true,
   "version": "0.1.0",
   "description": "Saxo Bank portfolio and margin dashboard that keeps its OpenAPI login alive.",
@@ -18,7 +18,8 @@
   "dependencies": {
     "@hono/node-server": "2.1.11",
     "big.js": "7.0.1",
-    "hono": "4.13.21"
+    "hono": "4.13.21",
+    "libdegiro": "1.1.0"
   },
   "devDependencies": {
     "@fontsource-variable/geist": "5.3.0",
