@@ -1,0 +1,8 @@
+packages: []
+
+allowBuilds:
+  esbuild: true
+  msw: false
+
+minimumReleaseAgeExclude:
+  - hono@4.13.21
