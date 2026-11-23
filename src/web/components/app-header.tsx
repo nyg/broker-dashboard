@@ -1,5 +1,6 @@
 import { LogOutIcon, RefreshCwIcon } from 'lucide-react'
 
+import { SourceLink } from '@/components/source-link'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { time } from '@/lib/format'
@@ -42,6 +43,7 @@ export function AppHeader({ client, session, fetchedAt, onReload, onLogout }: Ap
                   <LogOutIcon />
                </Button>
             )}
+            <SourceLink />
             <ThemeToggle />
          </div>
       </header>
